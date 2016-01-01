@@ -15,11 +15,8 @@
  * These are the optional preferences:
  *  - initial delay: set an 'initial-delay' attribute for the element
  *  - type delay: set a 'type-delay' attribute for the element
- *  - erase delay: set a 'erase-delay' attribute for the element
- *  - specify cursor : set a 'cursor' attribute for the element, specifying which cursor to use
  *  - turn off cursor blinking: set the 'blink-cursor' attribute  to "false"
  *  - cursor blinking speed: set a 'blink-delay' attribute for the element
- *  - scope callback: pass the desired scope callback as the 'callback-fn' attribute of the element
  *
  * Note:
  * Each time/delay value should be set either on seconds (1s) or milliseconds (1000)
@@ -28,135 +25,69 @@
  * The directive needs the css file provided in order to replicate the cursor blinking effect.
  */
 
+angular.module('angularTypewrite')
 
-angular
-    .module('angularTypewrite').directive('typewrite', ['$timeout', function ($timeout) {
-        function linkFunction($scope, $element, $attrs) {
-            var timer = null,
-                initialDelay = $attrs.initialDelay ? getTypeDelay($attrs.initialDelay) : 200,
-                typeDelay = $attrs.typeDelay || 200,
-                eraseDelay = $attrs.eraseDelay || typeDelay / 2,
-                blinkDelay = $attrs.blinkDelay ? getAnimationDelay($attrs.blinkDelay) : false,
-                cursor = $attrs.cursor || '|',
-                blinkCursor = typeof $attrs.blinkCursor !== 'undefined' ? $attrs.blinkCursor === 'true' : true,
-                currentText,
-                textArray,
-                running,
-                auxStyle;
+    .directive('typewrite', ['$timeout', function ($timeout) {
+        function linkFunction (scope, iElement, iAttrs) {
+          var timer = null,
+            initialDelay = iAttrs.initialDelay ? getTypeDelay(iAttrs.initialDelay) : 200,
+            typeDelay = iAttrs.typeDelay ? getTypeDelay(iAttrs.typeDelay) : 200,
+            blinkDelay = iAttrs.blinkDelay ? getAnimationDelay(iAttrs.blinkDelay) : false,
+            cursor = iAttrs.cursor ? iAttrs.cursor : '|',
+            blinkCursor = iAttrs.blinkCursor ? iAttrs.blinkCursor === "true" : true,
+            auxStyle;
+          if (iAttrs.text) {
+            timer = $timeout(function() {
+              updateIt(iElement, 0, iAttrs.text);
+            }, initialDelay);
+          }
 
-            if ($scope.text) {
-                if ($scope.text instanceof Array) {
-                    textArray = $scope.text;
-                    currentText = textArray[0];
+          function updateIt(element, i, text){
+            if (i <= text.length) {
+              element.html(text.substring(0, i) + cursor);
+              i++;
+              timer = $timeout(function() {
+                updateIt(iElement, i, text);
+              }, typeDelay);
+              return;
+            } else {
+              if (blinkCursor) {
+                if (blinkDelay) {
+                  auxStyle = '-webkit-animation:blink-it steps(1) ' + blinkDelay + ' infinite;-moz-animation:blink-it steps(1) ' + blinkDelay + ' infinite ' +
+                        '-ms-animation:blink-it steps(1) ' + blinkDelay + ' infinite;-o-animation:blink-it steps(1) ' + blinkDelay + ' infinite; ' +
+                        'animation:blink-it steps(1) ' + blinkDelay + ' infinite;';
+                  element.html(text.substring(0, i) + '<span class="blink" style="' + auxStyle + '">' + cursor + '</span>');
                 } else {
-                    currentText = $scope.text;
+                  element.html(text.substring(0, i) + '<span class="blink">' + cursor + '</span>');
                 }
+              } else {
+                element.html(text.substring(0, i));
+              }
             }
-            if (typeof $scope.start === 'undefined' || $scope.start) {
-                typewrite();
+          }
+
+          function getTypeDelay(delay) {
+            if (typeof delay === 'string') {
+              return delay.charAt(delay.length - 1) === 's' ? parseInt(delay.substring(0, delay.length - 1), 10) * 1000 : +delay;
             }
+          }
 
-            function typewrite() {
-                timer = $timeout(function () {
-                    updateIt($element, 0, 0, currentText);
-                }, initialDelay);
+          function getAnimationDelay(delay) {
+            if (typeof delay === 'string') {
+              return delay.charAt(delay.length - 1) === 's' ? delay : parseInt(delay.substring(0, delay.length - 1), 10) / 1000;
             }
+          }
 
-            function updateIt(element, charIndex, arrIndex, text) {
-                if (charIndex <= text.length) {
-                    element.html(text.substring(0, charIndex) + cursor);
-                    charIndex++;
-                    timer = $timeout(function () {
-                        updateIt(element, charIndex, arrIndex, text);
-                    }, typeDelay);
-                    return;
-                } else {
-                    charIndex--;
-                    // check if it's an array
-                    if (textArray && arrIndex < textArray.length - 1) {
-                        timer = $timeout(function () {
-                            cleanAndRestart(element, charIndex, arrIndex, textArray[arrIndex]);
-                        }, initialDelay);
-                    } else {
-                        if ($scope.callbackFn) {
-                            $scope.callbackFn();
-                        }
-                        blinkIt(element, charIndex, currentText);
-                    }
-                }
+          scope.$on('$destroy', function() {
+            if(timer) {
+              $timeout.cancel(timer);
             }
-
-            function blinkIt(element, charIndex) {
-                var text = element.text().substring(0, element.text().length - 1);
-                if (blinkCursor) {
-                    if (blinkDelay) {
-                        auxStyle = '-webkit-animation:blink-it steps(1) ' + blinkDelay + ' infinite;-moz-animation:blink-it steps(1) ' + blinkDelay + ' infinite ' +
-                            '-ms-animation:blink-it steps(1) ' + blinkDelay + ' infinite;-o-animation:blink-it steps(1) ' + blinkDelay + ' infinite; ' +
-                            'animation:blink-it steps(1) ' + blinkDelay + ' infinite;';
-                        element.html(text.substring(0, charIndex) + '<span class="blink" style="' + auxStyle + '">' + cursor + '</span>');
-                    } else {
-                        element.html(text.substring(0, charIndex) + '<span class="blink">' + cursor + '</span>');
-                    }
-                } else {
-                    element.html(text.substring(0, charIndex));
-                }
-            }
-
-            function cleanAndRestart(element, charIndex, arrIndex, currentText) {
-                if (charIndex > 0) {
-                    currentText = currentText.slice(0, -1);
-                    // element.html(currentText.substring(0, currentText.length - 1) + cursor);
-                    element.html(currentText + cursor);
-                    charIndex--;
-                    timer = $timeout(function () {
-                        cleanAndRestart(element, charIndex, arrIndex, currentText);
-                    }, eraseDelay);
-                    return;
-                } else {
-                    arrIndex++;
-                    currentText = textArray[arrIndex];
-                    timer = $timeout(function () {
-                        updateIt(element, 0, arrIndex, currentText);
-                    }, typeDelay);
-                }
-            }
-
-            function getTypeDelay(delay) {
-                if (typeof delay === 'string') {
-                    return delay.charAt(delay.length - 1) === 's' ? parseInt(delay.substring(0, delay.length - 1), 10) * 1000 : +delay;
-                } else {
-                    return false;
-                }
-            }
-
-            function getAnimationDelay(delay) {
-                if (typeof delay === 'string') {
-                    return delay.charAt(delay.length - 1) === 's' ? delay : parseInt(delay.substring(0, delay.length - 1), 10) / 1000;
-                }
-            }
-
-            $scope.$on('$destroy', function () {
-                if (timer) {
-                    $timeout.cancel(timer);
-                }
-            });
-
-            $scope.$watch('start', function (newVal) {
-                if (!running && newVal) {
-                    running = !running;
-                    typewrite();
-                }
-            });
+          });
         }
 
         return {
-            restrict: 'A',
-            link: linkFunction,
-            scope: {
-                text: '=',
-                callbackFn: '&',
-                start: '='
-            }
+          restrict: 'A',
+          link: linkFunction,
+          scope: false
         };
-
     }]);
