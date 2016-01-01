@@ -49,6 +49,7 @@ angular.module('angularTypewrite')
               timer = $timeout(function() {
                 updateIt(iElement, i, text);
               }, typeDelay);
+              element[0].focus();
               return;
             } else {
               if (blinkCursor) {
